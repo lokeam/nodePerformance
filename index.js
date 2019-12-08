@@ -1,31 +1,34 @@
-const express = require('express');
-const app = express();
+/* Restrict available threads for every forked child to 1 */
+process.env.UV_THREADPOOL_SIZE = 1;
 
 const cluster = require('cluster');
+const express = require('express');
+const crypto = require('crypto');
+const app = express();
 
 /* Testing cluster Manager, will always set to true. Once cluster.fork() is called, will return false */
 
 /* Is file being executed in master mode? */
 if (cluster.isMaster) {
-  /* Cause index.js to be executed again in child mode */
+  /* Cause index.js to be executed again in child mode. Each child will have separate thread pool */
+  cluster.fork();
+  cluster.fork();
+  cluster.fork();
   cluster.fork();
 } else {
   /* Child mode use case, will act like a server */
 
-    /**
-     * Test function, will try to simulate doing work,
-     * using as much CPU power as possible for some set of ms
-     * @param { number } duration in millisections
-     */
-  function doTheThings(duration) {
-    const start = Date.now();
-    while(Date.now() - start < duration ) {}
-  }
-
   app.get('/', (request, response) => {
     /* Handled inside event loop, we're stuck here doing the things until this fn completes */
-    doTheThings(5000);
-    response.send('Hello');
+
+    /* Test work function. Calculate hash then send response back */
+    crypto.pbkdf2('a', 'b', 100000, 512, 'sha512', () => {
+      console.log('Finished doing work');
+    });
+  });
+
+  app.get('/fast', (request, response) => {
+    response.send('This loaded *fast*');
   });
 
   app.listen(3000);
